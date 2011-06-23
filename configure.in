@@ -1,0 +1,29 @@
+AC_INIT([MyLang], [0.1])
+
+PKG_CHECK_MODULES(THIS, [mycpp-1.0 >= 0.1])
+AC_SUBST(THIS_CFLAGS)
+AC_SUBST(THIS_LIBS)
+
+AM_INIT_AUTOMAKE([1.7 gnu nostdinc])
+
+AC_PROG_CC
+AC_PROG_CXX
+AC_LIBTOOL_WIN32_DLL
+AC_PROG_LIBTOOL
+#LT_INIT(win32-dll)
+
+case "$host" in
+  *-*-mingw*|*-*-cygwin*)
+    platform_win32=yes
+    ;;
+  *)
+    platform_win32=no
+    ;;
+esac
+AM_CONDITIONAL(PLATFORM_WIN32, test x$platform_win32 = xyes)
+
+AC_CONFIG_FILES([Makefile
+		 mylang/Makefile
+		 mylang-1.0.pc])
+AC_OUTPUT
+

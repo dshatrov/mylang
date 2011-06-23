@@ -1,0 +1,4 @@
+MyLang is a set of parsing tools for the MyNC project.
+
+It was introduced to avoid code duplication between relic and scruffy.pargen.
+
