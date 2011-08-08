@@ -1,6 +1,4 @@
 COMMON_CFLAGS =				\
-	-D_POSIX_C_SOURCE=199309L	\
-	-D_XOPEN_SOURCE=600		\
 	-ggdb				\
 	-Wno-long-long -Wall -Wextra	\
 	$(THIS_CFLAGS)
@@ -11,7 +9,7 @@ else
     COMMON_CFLAGS += -rdynamic
 endif
 
-AM_CFLAGS = -std=c99 $(COMMON_CFLAGS)
+AM_CFLAGS = -std=gnu99 $(COMMON_CFLAGS)
 # -fno-default-inline is useful for debugging. It allows
 # for getting meaningful backtraces for faults in default-inline functions
 # defined in header files.
