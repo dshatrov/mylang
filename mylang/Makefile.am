@@ -3,9 +3,7 @@ COMMON_CFLAGS =				\
 	-Wno-long-long -Wall -Wextra	\
 	$(THIS_CFLAGS)
 
-if PLATFORM_WIN32
-    COMMON_CFLAGS += -DPLATFORM_WIN32
-else
+if !PLATFORM_WIN32
     COMMON_CFLAGS += -rdynamic
 endif
 
