@@ -25,15 +25,11 @@
 using namespace MyCpp;
 
 namespace MyLang {
-    
-UnicharStream::UnicharResult
-Utf8UnicharStream::getNextUnichar (Unichar *uc)
-    throw (InternalException)
-{
-    char cbuf [7];
-    zeroMemory (MemoryDesc (cbuf, sizeof cbuf));
 
-    byte_stream->setPosition (cur_pmark);
+UnicharStream::UnicharResult
+Utf8UnicharStream::doGetNextUnichar (Unichar * const ret_uc)
+{
+    char cbuf [7] = {};
 
     unsigned long i = 0;
     for (i = 0; i < 6; i++) {
@@ -52,17 +48,8 @@ Utf8UnicharStream::getNextUnichar (Unichar *uc)
 
 	cbuf [i] = c;
 	if (utf8_validate_sz (cbuf, NULL)) {
-	    if (uc != NULL)
-		*uc = utf8_valid_to_unichar (cbuf);
-
-	    cur_pmark = byte_stream->getPosition ();
-
-	    fpos.char_pos ++;
-	    if (isNewline (utf8_valid_to_unichar (cbuf))) {
-		fpos.line ++;
-		fpos.line_pos = 0;
-	    } else
-		fpos.line_pos ++;
+	    if (ret_uc != NULL)
+		*ret_uc = utf8_valid_to_unichar (cbuf);
 
 	    return UnicharNormal;
 	}
@@ -74,6 +61,91 @@ Utf8UnicharStream::getNextUnichar (Unichar *uc)
 
 //    throw ParsingException (fpos);
     throw InternalException ();
+}
+
+unsigned
+Utf8UnicharStream::skipNewline ()
+{
+    Unichar first_uc;
+    if (doGetNextUnichar (&first_uc) != UnicharNormal)
+        return 0;
+
+    if (first_uc == 0x0d /* \r */) {
+        Unichar second_uc;
+        if (doGetNextUnichar (&second_uc) != UnicharNormal)
+            return 0;
+
+        if (second_uc == 0x0a /* \n */)
+            return 2;
+
+        return 0;
+    }
+
+    if (first_uc == 0x0a /* \n */)
+        return 1;
+
+    return 0;
+}
+    
+UnicharStream::UnicharResult
+Utf8UnicharStream::getNextUnichar (Unichar * const ret_uc)
+    throw (InternalException)
+{
+    byte_stream->setPosition (cur_pmark);
+
+    Unichar uc;
+    for (;;) {
+        if (doGetNextUnichar (&uc) == UnicharEof)
+            return UnicharEof;
+
+        ++fpos.char_pos;
+        ++fpos.line_pos;
+        cur_pmark = byte_stream->getPosition ();
+
+        if (uc == 0x5c /* backslash */) {
+            unsigned const newline_len = skipNewline ();
+            if (newline_len > 0) {
+                fpos.char_pos += newline_len;
+                ++fpos.line;
+                fpos.line_pos = 0;
+                cur_pmark = byte_stream->getPosition ();
+                continue;
+            }
+
+            byte_stream->setPosition (cur_pmark);
+        }
+
+        break;
+    }
+
+    bool is_newline = false;
+    if (uc == 0x0d /* \r */) {
+        Unichar second_uc;
+        if (doGetNextUnichar (&second_uc) == UnicharNormal) {
+            if (second_uc == 0x0a /* \n */) {
+                uc = second_uc;
+                ++fpos.char_pos;
+                is_newline = true;
+            } else {
+                byte_stream->setPosition (cur_pmark);
+            }
+        } else {
+            byte_stream->setPosition (cur_pmark);
+        }
+    } else
+    if (uc == 0x0a /* \n */) {
+        is_newline = true;
+    }
+
+    if (is_newline) {
+        ++fpos.line;
+        fpos.line_pos = 0;
+    }
+
+    if (ret_uc)
+        *ret_uc = uc;
+
+    return UnicharNormal;
 }
 
 Ref<UnicharStream::PositionMarker>

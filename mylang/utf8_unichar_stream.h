@@ -44,10 +44,14 @@ protected:
 
     FilePosition fpos;
 
+    UnicharResult doGetNextUnichar (Unichar *ret_uc);
+
+    unsigned skipNewline ();
+
 public:
   /* UnicharStream interface */
 
-    UnicharResult getNextUnichar (Unichar *uc)
+    UnicharResult getNextUnichar (Unichar *ret_uc)
 			    throw (InternalException);
 
     Ref<UnicharStream::PositionMarker> getPosition ()
