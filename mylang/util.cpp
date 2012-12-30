@@ -26,23 +26,6 @@ using namespace MyCpp;
 
 namespace MyLang {
     
-bool
-isNewline (Unichar uc)
-    throw (InternalException)
-{
-  // FIXME This is ugly :) Just compare to the code point value for '\n'.
-
-    const char *newline = "\n";
-    if (!utf8_validate_sz (newline, NULL))
-	throw InternalException ();
-
-    Unichar newline_uc = utf8_valid_to_unichar (newline);
-    if (uc == newline_uc)
-	return true;
-
-    return false;
-}
-
 // Returns 'true' if we've got more preceding lines.
 static bool 
 seek_to_line_start (File *file)

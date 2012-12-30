@@ -30,9 +30,6 @@ namespace MyLang {
 
 using namespace MyCpp;
 
-bool isNewline (Unichar uc)
-	 throw (InternalException);
-
 void printErrorContext (File *out_file,
 			File *file,
 			FilePosition const &fpos)
