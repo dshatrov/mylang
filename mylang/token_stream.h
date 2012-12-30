@@ -39,7 +39,7 @@ public:
     // Simplicity is sacrificed for efficiency here.
     // The point is to be able to use PositionMarkers as stack-allocated objects
     // and pass them around (almost) by value. But, in some cases, position
-    // markers need to be more complex then the generalized form, hence we
+    // markers need to be more complex than the generalized form, hence we
     // provide a mechanism for implementing such complex markers (ptr,
     // copy_func, release_func).
     class PositionMarker

@@ -21,7 +21,6 @@ mylang_target_headers =		\
 	file_position.h		\
 	token.h			\
 				\
-	character_recognizer.h	\
 	token_stream.h		\
 	file_token_stream.h	\
 				\
@@ -62,7 +61,6 @@ endif
 libmylang_1_0_la_SOURCES =		\
 	util.cpp			\
 					\
-	character_recognizer.cpp	\
 	token_stream.cpp		\
 	file_token_stream.cpp		\
 					\

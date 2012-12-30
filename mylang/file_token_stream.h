@@ -20,11 +20,12 @@
 #ifndef __MYLANG__FILE_TOKEN_STREAM_H__
 #define __MYLANG__FILE_TOKEN_STREAM_H__
 
+
 #include <mycpp/mycpp.h>
 #include <mycpp/file.h>
 
 #include <mylang/token_stream.h>
-#include <mylang/character_recognizer.h>
+
 
 namespace MyLang {
 
@@ -36,16 +37,18 @@ class FileTokenStream : public TokenStream
 
 protected:
     Ref<File> file;
-    Ref<CharacterRecognizer> char_recognizer;
 
-    bool report_newlines;
+    bool const report_newlines;
+    bool const minus_is_alpha;
 
     unsigned long cur_line;
     Uint64 cur_line_start;
     Uint64 cur_line_pos;
     Uint64 cur_char_pos;
 
-    Ref<String> token;
+    Byte *token_buf;
+    Size token_len;
+    Size const max_token_len;
 
 public:
   // TokenStream interface
@@ -70,11 +73,15 @@ public:
   // (End of TokenStream interface)
 
     FileTokenStream (File *file,
-		     CharacterRecognizer *char_recognizer = NULL,
-		     bool report_newlines = false);
+		     bool report_newlines = false,
+                     bool minus_is_alpha  = false,
+                     Uint64 max_token_len = 4096);
+
+    ~FileTokenStream ();
 };
 
 }
+
 
 #endif /* __MYLANG__FILE_TOKEN_STREAM_H__ */
 

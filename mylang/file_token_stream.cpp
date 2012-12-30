@@ -1,5 +1,5 @@
 /*  MyLang - Utility library for writing parsers
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -20,8 +20,10 @@
 #include <mycpp/util.h>
 #include <mycpp/buffer.h>
 #include <mycpp/io.h>
+#include <mycpp/unicode.h>
 
 #include <mylang/file_token_stream.h>
+
 
 #define DEBUG(a) ;
 // Flow
@@ -31,37 +33,26 @@
 
 #define MYLANG__MAX_TOKEN_LENGTH 1024
 
+
 using namespace MyCpp;
 
 namespace MyLang {
 
-static bool
-is_whitespace (unsigned char c,
-	       CharacterRecognizer *char_recognizer)
+static inline bool
+is_whitespace (unsigned char const c)
 {
-    abortIf (char_recognizer == NULL);
-
-    if (char_recognizer->isSpace ((Unichar) c))
-	return true;
-
-    return false;
+    return unicode_isSpace ((Unichar) c);
 }
 
-static bool
-is_newline (unsigned char c,
-	    CharacterRecognizer *char_recognizer)
+static inline bool
+is_newline (unsigned char const c)
 {
-    abortIf (char_recognizer == NULL);
-
     // TODO Handle CRLF
-    if (char_recognizer->isNewline ((Unichar) c))
-	return true;
-
-    return false;
+    return unicode_isNewline ((Unichar) c) != FuzzyResult::No;
 }
 
-static bool is_character (unsigned char c,
-			  CharacterRecognizer *char_recognizer)
+static bool is_character (unsigned char const c,
+                          bool          const minus_is_alpha)
 {
 #if 0
     // NOTE: These checks are meant to be temporal as they don't
@@ -77,12 +68,10 @@ static bool is_character (unsigned char c,
     return false;
 #endif
 
-    abortIf (char_recognizer == NULL);
-
-    if (c == '_')
+    if (c == '_' || (minus_is_alpha && c == '-'))
 	return true;
 
-    return char_recognizer->isAlphanumeric ((Unichar) c);
+    return unicode_isAlphanumeric ((Unichar) c);
 }
 
 // A token is one of the following:
@@ -94,13 +83,11 @@ FileTokenStream::getNextToken ()
 try {
     // NOTE: Changing the size of 'buf' is useful for debugging.
     //
-    // [10.09.07] I guess 4096 is way too much. Worse than that,
-    //            I don't fill satisfied with the way this class
-    //            is implemented. It seems to be _very_ ineffective.
+    // [10.09.07] I guess 4096 is way too much.
     unsigned char buf [4096];
     Uint64 buf_start_pos;
 
-    token = NULL;
+    token_len = 0;
 
     for (;;) {
 	buf_start_pos = file->tell ();
@@ -108,8 +95,8 @@ try {
 	unsigned long nread;
 	IOResult res = file->read (MemoryDesc::forObject (buf), &nread);
 	if (res == IOResultEof) {
-	    if (!token.isNull ())
-		return token->getMemoryDesc ();
+	    if (token_len > 0)
+		return ConstMemoryDesc (token_buf, token_len);
 
 	    return ConstMemoryDesc ();
 	}
@@ -127,23 +114,22 @@ try {
 
 	// start_offset is offset to the first non-whitespace character in the buffer.
 	unsigned long start_offset = 0;
-	if (token.isNull ()) {
+	if (token_len == 0) {
 	  // We've got no bytes for the token so far. That means that we're
 	  // in the process of skipping leading whitespace. Let's skip some more.
 
 	    bool got_newline = false;
 
 	    for (start_offset = 0; start_offset < nread; start_offset++) {
-		if (is_newline (buf [start_offset], char_recognizer)) {
+		if (is_newline (buf [start_offset])) {
 		    cur_line ++;
 		    cur_line_start = buf_start_pos + start_offset + 1;
 		    got_newline = true;
 		} else
-		if (!is_whitespace (buf [start_offset], char_recognizer)) {
+		if (!is_whitespace (buf [start_offset])) {
 		  // This is where we detect the beginning of a new token.
 
 		    abortIf (buf_start_pos + start_offset < cur_line_start);
-//		    cur_line_pos = (buf_start_pos + start_offset) - cur_line_start;
 		    cur_line_pos = cur_line_start;
 		    cur_char_pos = buf_start_pos + start_offset;
 
@@ -176,13 +162,13 @@ try {
 	// 'whsp' is the offset from the start of the buffer to the end of the token.
 	unsigned long whsp;
 	bool got_whsp = false;
-	if (!is_character (buf [start_offset], char_recognizer)) {
+	if (!is_character (buf [start_offset], minus_is_alpha)) {
 	  // We've got a symbol that is not a character nor whitespace.
 	  // This symbol should constitute a separate token.
 	  // Hence, if the token has already started, then this symbol marks
 	  // the end of the token. Otherwise, the symbol is the token.
 
-	    if (token.isNull ()) {
+	    if (token_len == 0) {
 		whsp = start_offset + 1;
 		got_whsp = true;
 	    } else {
@@ -191,7 +177,7 @@ try {
 	    }
 	} else {
 	    for (whsp = start_offset + 1; whsp < nread; whsp++) {
-		if (!is_character (buf [whsp], char_recognizer)) {
+		if (!is_character (buf [whsp], minus_is_alpha)) {
 		    got_whsp = true;
 		    break;
 		}
@@ -199,56 +185,21 @@ try {
 	}
 
 	if (whsp > start_offset) {
-	    {
-	      // Checking for token length integer overflow
+            if (token_len + (whsp - start_offset) > max_token_len)
+                throw InternalException (String::forData ("Token length limit exceeded"));
 
-		unsigned long new_len = whsp - start_offset;
-		if (!token.isNull ()) {
-		    if (new_len + token->getLength () <= new_len)
-			throw InternalException (String::forData ("Token length overflow"));
-
-		    new_len += token->getLength ();
-		}
-
-	      // Checking for token length limit
-
-		if (new_len > MYLANG__MAX_TOKEN_LENGTH) {
-		    errf->print ("MyLang.FileTokenStream.getNextToken: "
-				 "token length limit exceeded (")
-			 .print ((unsigned long) MYLANG__MAX_TOKEN_LENGTH)
-			 .print (" bytes max)")
-			 .pendl ();
-
-		    throw InternalException (String::forData ("Token length limit exceeded"));
-		}
-	    }
-
-	    if (token.isNull ()) {
-		token = grab (new String ());
-		token->allocate (whsp - start_offset);
-		copyMemory (token->getMemoryDesc (), ConstMemoryDesc (buf + start_offset, whsp - start_offset));
-		token->getData () [whsp - start_offset] = 0;
-	    } else {
-		Ref<String> new_token = grab (new String ());
-		new_token->allocate (token->getLength () + (whsp - start_offset));
-		copyMemory (new_token->getMemoryDesc (),
-			    ConstMemoryDesc (token->getData (), token->getLength ()));
-		copyMemory (new_token->getMemoryDesc ().getRegionOffset (token->getLength ()),
-			    ConstMemoryDesc (buf + start_offset, whsp - start_offset));
-		new_token->getData () [token->getLength () + (whsp - start_offset)] = 0;
-
-		token = new_token;
-	    }
+            memcpy (token_buf + token_len, buf + start_offset, whsp - start_offset);
+            token_len += (whsp - start_offset);
 	}
 
 	if (got_whsp) {
 	    file->seekSet (buf_start_pos + whsp);
 
 	  DEBUG_INT (
-	    errf->print ("MyLang.FileTokenStream.getNextToken: token: \"").print (token).print ("\"")
+	    errf->print ("MyLang.FileTokenStream.getNextToken: token: \"").print (ConstMemoryDesc (token_buf, token_len)).print ("\"")
 		 .pendl ();
 	  )
-	    return token->getMemoryDesc ();
+            return ConstMemoryDesc (token_buf, token_len);
 	}
     } /* for (;;) */
 
@@ -320,26 +271,28 @@ try {
     throw InternalException (String::nullString (), exc.clone ());
 }
 
-FileTokenStream::FileTokenStream (File *file,
-				  CharacterRecognizer *char_recognizer,
-				  bool report_newlines)
+FileTokenStream::FileTokenStream (File * const file,
+				  bool   const report_newlines,
+                                  bool   const minus_is_alpha,
+                                  Size   const max_token_len)
+    : file            (file),
+      report_newlines (report_newlines),
+      minus_is_alpha  (minus_is_alpha),
+      cur_line        (0),
+      cur_line_start  (0),
+      cur_line_pos    (0),
+      cur_char_pos    (0),
+      token_len       (0),
+      max_token_len  (max_token_len)
 {
-    if (file == NULL)
-	abortIfReached ();
+    abortIf (file == NULL);
 
-    this->file = file;
+    token_buf = new Byte [max_token_len];
+}
 
-    if (char_recognizer == NULL)
-	this->char_recognizer = grab (new CharacterRecognizer);
-    else
-	this->char_recognizer = char_recognizer;
-
-    this->report_newlines = report_newlines;
-
-    cur_line = 0;
-    cur_line_start = 0;
-    cur_line_pos = 0;
-    cur_char_pos = 0;
+FileTokenStream::~FileTokenStream ()
+{
+    delete token_buf;
 }
 
 }
