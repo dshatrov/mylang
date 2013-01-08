@@ -106,18 +106,19 @@ public:
 
     // If newlines are reported, then "\n" string will be returned for any whitespace
     // which contains one or more newlines (see newline(), isNewline() methods).
-//    virtual Ref<String> getNextToken ()
-//			       throw (InternalException) = 0;
+    //
     // The memory returned stays valid till the next call to getNextToken().
-    virtual ConstMemoryDesc getNextToken () = 0;
+//    virtual ConstMemoryDesc getNextToken ()
+//                                   throw (InternalException) = 0;
+    virtual mt_throws M::Result getNextToken (M::ConstMemory *ret_mem) = 0;
 
     // User-defined objects may be associated with tokens by lower-level tokenizers.
-//    virtual Ref<String> getNextToken (Ref<SimplyReferenced> *ret_user_obj,
-//				      void **ret_user_ptr)
-//			       throw (InternalException);
-    virtual ConstMemoryDesc getNextToken (Ref<SimplyReferenced> *ret_user_obj,
-					  void **ret_user_ptr)
-				   throw (InternalException);
+//    virtual ConstMemoryDesc getNextToken (Ref<SimplyReferenced> *ret_user_obj,
+//					  void **ret_user_ptr)
+//				   throw (InternalException);
+    virtual mt_throws M::Result getNextToken (M::ConstMemory  *ret_mem,
+                                              M::VirtRef      *ret_user_obj,
+                                              void           **ret_user_ptr);
 
     virtual void getPosition (PositionMarker *ret_pmark /* non-null */)
 		       throw (InternalException) = 0;

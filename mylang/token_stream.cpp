@@ -19,22 +19,23 @@
 
 #include <mylang/token_stream.h>
 
+
 using namespace MyCpp;
 
 namespace MyLang {
 
-ConstMemoryDesc
-TokenStream::getNextToken (Ref<SimplyReferenced> *ret_user_obj,
-			   void **ret_user_ptr)
-    throw (InternalException)
+mt_throws M::Result
+TokenStream::getNextToken (M::ConstMemory  * const ret_mem,
+                           M::VirtRef      * const ret_user_obj,
+			   void           ** const ret_user_ptr)
 {
-    if (ret_user_obj != NULL)
+    if (ret_user_obj)
 	*ret_user_obj = NULL;
 
-    if (ret_user_ptr != NULL)
+    if (ret_user_ptr)
 	*ret_user_ptr = NULL;
 
-    return getNextToken ();
+    return mt_throws getNextToken (ret_mem);
 }
 
 }

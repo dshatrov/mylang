@@ -1,5 +1,5 @@
 /*  MyLang - Utility library for writing parsers
-    Copyright (C) 2011 Dmitry Shatrov
+    Copyright (C) 2011, 2012 Dmitry Shatrov
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -53,8 +53,7 @@ protected:
 public:
   // TokenStream interface
 
-    ConstMemoryDesc getNextToken ()
-			   throw (InternalException);
+    mt_throws M::Result getNextToken (M::ConstMemory *ret_mem);
 
     void getPosition (PositionMarker *ret_pmark /* non-null */)
 	       throw (InternalException);

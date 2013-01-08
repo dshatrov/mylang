@@ -77,10 +77,14 @@ static bool is_character (unsigned char const c,
 // A token is one of the following:
 // a) a string of consequtive alphanumeric characters;
 // b) a single non-alphanumeric character that is not whitespace.
-ConstMemoryDesc
-FileTokenStream::getNextToken ()
-    throw (InternalException)
+mt_throws M::Result
+FileTokenStream::getNextToken (M::ConstMemory * const ret_mem)
 try {
+    // TODO This code is inefficient becasue it uses read(4Kb)+seek for
+    //      every token. Using CachedFile is not enough because there's still
+    //      a lot of unnecessary memory copying (bulk reads).
+    //      Lexing logics should really be monolithic.
+
     // NOTE: Changing the size of 'buf' is useful for debugging.
     //
     // [10.09.07] I guess 4096 is way too much.
@@ -95,10 +99,13 @@ try {
 	unsigned long nread;
 	IOResult res = file->read (MemoryDesc::forObject (buf), &nread);
 	if (res == IOResultEof) {
-	    if (token_len > 0)
-		return ConstMemoryDesc (token_buf, token_len);
+	    if (token_len > 0) {
+                *ret_mem = M::ConstMemory (token_buf, token_len);
+                return M::Result::Success;
+            }
 
-	    return ConstMemoryDesc ();
+            *ret_mem = M::ConstMemory();
+            return M::Result::Success;
 	}
 
 	if (res != IOResultNormal)
@@ -145,7 +152,8 @@ try {
 		DEBUG (
 		    errf->print ("MyLang.FileTokenStream.getNextToken: returning a newline").pendl ();
 		)
-		return ConstMemoryDesc::forString ("\n");
+                *ret_mem = M::ConstMemory ("\n");
+                return M::Result::Success;
 	    }
 
 	    if (start_offset == nread) {
@@ -199,14 +207,16 @@ try {
 	    errf->print ("MyLang.FileTokenStream.getNextToken: token: \"").print (ConstMemoryDesc (token_buf, token_len)).print ("\"")
 		 .pendl ();
 	  )
-            return ConstMemoryDesc (token_buf, token_len);
+            *ret_mem = M::ConstMemory (token_buf, token_len);
+            return M::Result::Success;
 	}
     } /* for (;;) */
 
-    abortIfReached ();
-    return ConstMemoryDesc ();
-} catch (Exception &exc) {
-    throw InternalException (String::nullString (), exc.clone ());
+    unreachable ();
+    return M::Result::Failure;
+} catch (Exception & /* exc */) {
+    M::exc_throw <M::InternalException> (M::InternalException::BackendError);
+    return M::Result::Failure;
 }
 
 void
